@@ -28,78 +28,48 @@ cat "bcimages${TOPIC}.text" | grep "Post by" | tail -n1 > lastpost.txt
 awk '/^Post/{ f = sprintf("docs/doc_%04d.text", d++) } f{print > f} /^`SMF/{f=""}' "bcimages${TOPIC}.text"
 sed -i '$d' docs/doc*
 
-for file in $( grep -oPi "(jpg)|(jpeg)|(png)" docs/* | cut -d: -f1) ; do
-    CAPTION="$(cat $file | grep -Pvi 'http[s]*://[a-z0-9-.\/]*.(jpg)|(png)|(jpeg)(gif)'| jq -sRr @uri)"
-    IMAGEURL=$(cat $file | grep -Poi 'http[s]*://[a-z0-9-.\/]*.(jpg)|(png)|(jpeg)(gif)$' )
-    echo "creating: for $file:"
-#   echo " CAPTION: ${CAPTION}"
-#   echo " IMAGEURL: ${IMAGEURL}"
-
-    CREATIONID=$( curl -X POST "https://graph.facebook.com/${IGID}/media?image_url=${IMAGEURL}&caption=${CAPTION}&access_token=${TOKEN}" | jq -r .id )
-
-    echo "CREATIONID: ${CREATIONID}"
-    if [ ${CREATIONID:-} ] ; then
-        curl -X POST "https://graph.facebook.com/${IGID}/media_publish?creation_id=${CREATIONID}&access_token=${TOKEN}" | jq .
+IMAGESDIR="/srv/www/revive-adserver/images"
+IGIMGSOURCE="https://pub.barbearclassico.com/images"
+for article in $( grep -oPi "(jpg)|(jpeg)|(png)" docs/* | cut -d: -f1) ; do
+    IGCAPTION="$(cat $article | grep -Pvi 'http[s]*://[a-z0-9-.\/]*.(jpg)|(png)|(jpeg)(gif)' | \
+	    sed -e '/.. raw::/,+3 d' -e 's/*//g' -e '/^$/d' -e 's/^[[:space:]]*//g' | \
+	    jq -sRr @uri)"
+    IMAGEURL=$(cat $article | grep -Poi 'http[s]*://[a-z0-9-.\/]*.(jpg)|(png)|(jpeg)(gif)$' )
+    file=$(mktemp ${IMAGESDIR}/imageXXXXXXXX)
+    newfile=$(mktemp -u igpostXXXXXXXX)
+    curl -k -o "${file}" ${IMAGEURL} 2>/dev/null
+    set -- $(identify -format "%w %h %m" $file)
+    RATIO=$(echo "scale=2 ; ${2} * 16  / ${1}" | bc)
+    EXTENSION=${3}
+    if [ $(echo "$RATIO > 9" | bc -l ) -eq 1 ]; then
+        echo "$file: 16x${RATIO} image is Ok for instagram"
+        mv "${file}" "${IMAGESDIR}/${newfile}.${EXTENSION}"
     else
-        echo "CREATIONID not created"
+        echo "$file: image ratio is 16x ${RATIO}: IT WILL FAIL TO UPLOAD"
+        #  # assuming its not portrait
+        #  # image size should be 16x9
+        #  $1 - 16
+        #  $2 - 9
+        #  image size should be $1 * 9 / 16
+        NEWSIZE=$(echo "${1} * 9  / 16" | bc)
+        echo "we should change the image from ${1}x${2} to ${1}x${NEWSIZE}"
+        convert -background white -gravity center ${file} -resize ${1}x${NEWSIZE} -extent ${1}x${NEWSIZE} "${IMAGESDIR}/${newfile}.${EXTENSION}"
+	rm ${file}
     fi
 
+    echo "${IMAGESDIR}/$newfile.${EXTENSION}"
+    echo "${IGIMGSOURCE}/$newfile.${EXTENSION}"
+    IGIMAGE="${IGIMGSOURCE}/$newfile.${EXTENSION}"
+    if [ ${PUBLISH:-} ] ; then
+
+        CREATIONID=$( curl -X POST "https://graph.facebook.com/${IGID}/media?image_url=${IGIMAGE}&caption=${IGCAPTION}&access_token=${TOKEN}" | jq -r .id )
+        echo "CREATIONID: ${CREATIONID}"
+        if [ ${CREATIONID:-} ] ; then
+            curl -X POST "https://graph.facebook.com/${IGID}/media_publish?creation_id=${CREATIONID}&access_token=${TOKEN}" | jq .
+        else
+            echo "CREATIONID not created"
+        fi
+    fi
 done
-
-
-
-exit 0
-
-
-lastpost=$( cat bcimages2.text | grep -n "Post by" | tail -n1 )
-firstpost=$( cat bcimages2.text | grep -n "Post by" | head -n1 )
-# cat bcimages2.text | grep -n "Post by" | tail -n1
-# 366:Post by: LATHERÃO on NOVEMBER 19, 2021, 12:28:09 PM
-
-# is this the firstpost?
-#  publish post
-
-# get_new_file ()
-# if [ lastpostnewfile = lastpost ]; then
-#    exit
-# else
-#    getposts
-# 
-
-# awk '/^Post/{f="doc."++d} f{print > f} /^SMF/{f=""}' bcimages2.text
-awk '/^Post/{ f = sprintf("docs/doc_%04d.text", d++) } f{print > f} /^SMF/{f=""}' bcimages-test002.text 
-
-
-# delete last 2 lines
-sed -i '$d' docs/doc* ; sed -i '$d' docs/doc*
-
-#  now publish one per doc file:
-for article in docs/* ; do 
-	
-
-done
-
-for file in docs do:
-
-    PRECAPTION="$(cat $file | grep -iv 'http[s]://[a-z.-]*/[a-z0-9+-/]*[.jpg]' | jq -sRr @uri)"
-    CAPTION="$(cat $file | grep -iv 'http[s]://[a-z.-]*/[a-z0-9+-/]*[.jpg]' | jq -sRr @uri)"
-    IMAGEURL=$(cat file | grep -Poi 'http[s]://[a-z0-9-.\/]*.(jpg)|(png)|(jpeg)(gif)$' )
-
-
-
-# curl -X GET "https://graph.facebook.com/v12.0/17841408630115897/media?access_token=${TOKEN}" | jq .
-
-# curl -X GET "https://graph.facebook.com/v12.0/${IGID}/media?access_token=${TOKEN}" | jq .
-
-CREATIONID=$( curl -X POST "https://graph.facebook.com/${IGID}/media?image_url=${IMAGEURL}&caption=${CAPTION}&access_token=${TOKEN}" | jq -r .id )
-
-if [ CREATIONID:- ] ; then
-  curl -X POST "https://graph.facebook.com/${IGID}/media_publish?creation_id=${CREATIONID}&access_token=${TOKEN}" | jq .
-else
-  CREATIONID not created
-fi
-# POST graph.facebook.com/17841400008460056/media
-#  ?image_url=https//www.example.com/images/bronz-fonz.jpg
-#   &caption=%23BronzFonz
 
 
