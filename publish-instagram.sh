@@ -1,8 +1,9 @@
 #!/bin/sh
 
 . ./credentials.txt
-
+PUBLISH=1
 rm -f docs/*
+rm postqueue.txt
 TOPIC=$(curl -k  https://www.barbearclassico.com/index.php?board=15.0 2>/dev/null |\
        grep "span id=" | head -n1 |\
        awk -F"?topic=" '{ print $2 }' | awk -F\" '{ print $1 }')
@@ -24,7 +25,7 @@ if [ -f lastpost.txt ]; then
     [ ${line:-} ] && sed -i  "1,${line}d" "bcimages${TOPIC}.text"
 fi 
 
-cat "bcimages${TOPIC}.text" | grep "Post by" | tail -n1 > lastpost.txt
+LASTPOST=$(cat "bcimages${TOPIC}.text" | grep "Post by" | tail -n1)
 awk '/^Post/{ f = sprintf("docs/doc_%04d.text", d++) } f{print > f} /^`SMF/{f=""}' "bcimages${TOPIC}.text"
 sed -i '$d' docs/doc*
 
@@ -53,23 +54,31 @@ for article in $( grep -oPi "(jpg)|(jpeg)|(png)" docs/* | cut -d: -f1) ; do
         #  image size should be $1 * 9 / 16
         NEWSIZE=$(echo "${1} * 9  / 16" | bc)
         echo "we should change the image from ${1}x${2} to ${1}x${NEWSIZE}"
-        convert -background white -gravity center ${file} -resize ${1}x${NEWSIZE} -extent ${1}x${NEWSIZE} "${IMAGESDIR}/${newfile}.${EXTENSION}"
+        convert -background white -gravity center ${file} -resize ${1}x${NEWSIZE} \
+		-extent ${1}x${NEWSIZE} "${IMAGESDIR}/${newfile}.${EXTENSION}"
 	rm ${file}
     fi
-
     echo "${IMAGESDIR}/$newfile.${EXTENSION}"
+    chmod 666 "${IMAGESDIR}/$newfile.${EXTENSION}"
     echo "${IGIMGSOURCE}/$newfile.${EXTENSION}"
     IGIMAGE="${IGIMGSOURCE}/$newfile.${EXTENSION}"
-    if [ ${PUBLISH:-} ] ; then
+    echo "${IGIMAGE} ${IGCAPTION}" >> postqueue.txt
+done
 
-        CREATIONID=$( curl -X POST "https://graph.facebook.com/${IGID}/media?image_url=${IGIMAGE}&caption=${IGCAPTION}&access_token=${TOKEN}" | jq -r .id )
+if [ ${PUBLISH:-} ] ; then
+    cat postqueue.txt | while read line;
+    do
+        set -- $line
+        echo "Image: $1 Caption $2"
+
+        CREATIONID=$( curl -X POST "https://graph.facebook.com/${IGID}/media?image_url=${1}&caption=${2}&access_token=${TOKEN}" | jq -r .id )
         echo "CREATIONID: ${CREATIONID}"
         if [ ${CREATIONID:-} ] ; then
             curl -X POST "https://graph.facebook.com/${IGID}/media_publish?creation_id=${CREATIONID}&access_token=${TOKEN}" | jq .
         else
             echo "CREATIONID not created"
         fi
-    fi
-done
-
+    done
+    echo ${LASTPOST} > lastpost.txt
+fi
 
