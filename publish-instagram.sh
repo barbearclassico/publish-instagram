@@ -10,6 +10,7 @@ Usage: $0 <OPTION>
 
 Options:
   -d                           dry run
+  -f <file>                    just publish from postqueue
   -q                           show quota usage
   -h                           shows this help
 
@@ -27,19 +28,35 @@ quotausage () {
     jq .
 }
 
-while getopts ":dq" opt; do
+publishqueue () {
+    cat ${1} | while read line;
+    do
+        set -- $line
+        echo "Image: $1 Caption $2"
+
+        CREATIONID=$( curl -X POST "https://graph.facebook.com/${IGID}/media?image_url=${1}&caption=${2}&access_token=${TOKEN}" | jq -r .id )
+        echo "CREATIONID: ${CREATIONID}"
+        if [ ${CREATIONID:-} ] ; then
+            curl -X POST "https://graph.facebook.com/${IGID}/media_publish?creation_id=${CREATIONID}&access_token=${TOKEN}" | jq .
+        else
+            echo "CREATIONID not created"
+        fi
+    done
+}
+
+while getopts "f:dq" opt; do
   case ${opt} in
-    d )
-        unset PUBLISH
-      ;;
-    q )
-	quotausage
-        exit 0
-      ;;
-    \? )
-        usage
-	exit 0
-      ;;
+    f) publishqueue $OPTARG
+       exit 0
+       ;;
+    d) unset PUBLISH ;;
+    q) quotausage
+       exit 0
+       ;;
+    \?)
+       usage
+       exit 0
+       ;;
   esac
 done
 
@@ -76,7 +93,7 @@ for article in $( grep -oPi "(jpg)|(jpeg)|(png)" docs/* | cut -d: -f1) ; do
     IGCAPTION="$(cat $article | grep -Pvi 'http[s]*://[a-z0-9-.\/]*.(jpg)|(png)|(jpeg)(gif)' | \
 	    sed -e '/.. raw::/,+3 d' -e 's/*//g' -e '/^$/d' -e 's/^[[:space:]]*//g' | \
 	    jq -sRr @uri)"
-    IMAGEURL=$(cat $article | grep -Poi 'http[s]*://[a-z0-9-.\/]*.(jpg)|(png)|(jpeg)(gif)$' )
+    IMAGEURL=$(cat $article | grep -Poi 'http[s]*://[a-z0-9-.\/]*.(jpg)|(png)|(jpeg)(gif)$' | head -n1 )
     file=$(mktemp ${IMAGESDIR}/imageXXXXXXXX)
     newfile=$(mktemp -u igpostXXXXXXXX)
     curl -k -o "${file}" ${IMAGEURL} 2>/dev/null
@@ -99,10 +116,11 @@ for article in $( grep -oPi "(jpg)|(jpeg)|(png)" docs/* | cut -d: -f1) ; do
 		-extent ${1}x${NEWSIZE} "${IMAGESDIR}/${newfile}.${EXTENSION}"
 	rm ${file}
     fi
-    echo "${IMAGESDIR}/$newfile.${EXTENSION}"
+    # echo "${IMAGESDIR}/$newfile.${EXTENSION}"
     chmod 666 "${IMAGESDIR}/$newfile.${EXTENSION}"
-    echo "${IGIMGSOURCE}/$newfile.${EXTENSION}"
+    # echo "${IGIMGSOURCE}/$newfile.${EXTENSION}"
     IGIMAGE="${IGIMGSOURCE}/$newfile.${EXTENSION}"
+    echo ${IGIMAGE}
     echo "${IGIMAGE} ${IGCAPTION}" >> postqueue.txt
 done
 
