@@ -1,7 +1,48 @@
 #!/bin/sh
 
 . ./credentials.txt
+
 PUBLISH=1
+usage () {
+echo
+cat <<- EOF
+Usage: $0 <OPTION>
+
+Options:
+  -d                           dry run
+  -q                           show quota usage
+  -h                           shows this help
+
+Requirements:
+  credentials.txt
+  imagemagick
+
+EOF
+}
+
+quotausage () {
+    curl \
+        -X GET \
+	"https://graph.facebook.com/${apiversion}/${IGID}/content_publishing_limit?fields=config,quota_usage,rate_limit_settings&access_token=${TOKEN}"	2>/dev/null | \
+    jq .
+}
+
+while getopts ":dq" opt; do
+  case ${opt} in
+    d )
+        unset PUBLISH
+      ;;
+    q )
+	quotausage
+        exit 0
+      ;;
+    \? )
+        usage
+	exit 0
+      ;;
+  esac
+done
+
 rm -f docs/*
 rm postqueue.txt
 TOPIC=$(curl -k  https://www.barbearclassico.com/index.php?board=15.0 2>/dev/null |\
