@@ -80,7 +80,7 @@ if [ -f lastpost.txt ]; then
 	    exit 0
     fi
     line=$( grep -n "$lastpost" "bcimages${TOPIC}.text" | cut -f1 -d: )
-    [ ${line:-} ] && sed -i  "1,${line}d" "bcimages${TOPIC}.text"
+#    [ ${line:-} ] && sed -i  "1,${line}d" "bcimages${TOPIC}.text"
 fi 
 
 LASTPOST=$(cat "bcimages${TOPIC}.text" | grep "Post by" | tail -n1)
@@ -100,21 +100,24 @@ for article in $( grep -oPi "(jpg)|(jpeg)|(png)" docs/* | cut -d: -f1) ; do
     set -- $(identify -format "%w %h %m" $file)
     RATIO=$(echo "scale=2 ; ${2} * 16  / ${1}" | bc)
     EXTENSION=${3}
-    if [ $(echo "$RATIO > 9" | bc -l ) -eq 1 ]; then
-        echo "$file: 16x${RATIO} image is Ok for instagram"
-        mv "${file}" "${IMAGESDIR}/${newfile}.${EXTENSION}"
-    else
-        echo "$file: image ratio is 16x ${RATIO}: IT WILL FAIL TO UPLOAD"
-        #  # assuming its not portrait
-        #  # image size should be 16x9
-        #  $1 - 16
-        #  $2 - 9
-        #  image size should be $1 * 9 / 16
-        NEWSIZE=$(echo "${1} * 9  / 16" | bc)
-        echo "we should change the image from ${1}x${2} to ${1}x${NEWSIZE}"
-        convert -background white -gravity center ${file} -resize ${1}x${NEWSIZE} \
-		-extent ${1}x${NEWSIZE} "${IMAGESDIR}/${newfile}.${EXTENSION}"
+    if [ ${2} -gt ${1} ] ; then
+        echo "it's a portrait, make it square"
+        convert -background white -gravity center ${file} -resize ${2}x${2} \
+		-extent ${2}x${2} "${IMAGESDIR}/${newfile}.${EXTENSION}"
 	rm ${file}
+    else
+        if [ $(echo "$RATIO > 9" | bc -l ) -eq 1 ]; then
+            echo "$file: 16x${RATIO} image is Ok for instagram"
+            mv "${file}" "${IMAGESDIR}/${newfile}.${EXTENSION}"
+        else
+            echo "$file: image ratio is 16x ${RATIO}: IT WILL FAIL TO UPLOAD"
+            # image size should be 16x9 so image height should be $1 * 9 / 16
+            NEWSIZE=$(echo "${1} * 9  / 16" | bc)
+            echo "we should change the image from ${1}x${2} to ${1}x${NEWSIZE}"
+            convert -background white -gravity center ${file} -resize ${1}x${NEWSIZE} \
+            	-extent ${1}x${NEWSIZE} "${IMAGESDIR}/${newfile}.${EXTENSION}"
+            rm ${file}
+        fi
     fi
     # echo "${IMAGESDIR}/$newfile.${EXTENSION}"
     chmod 666 "${IMAGESDIR}/$newfile.${EXTENSION}"
