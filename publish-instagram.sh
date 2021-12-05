@@ -61,16 +61,17 @@ while getopts "f:dq" opt; do
 done
 
 rm -f docs/*
-rm postqueue.txt
+mkdir -p docs
+rm -f postqueue.txt
 TOPIC=$(curl -k  https://www.barbearclassico.com/index.php?board=15.0 2>/dev/null |\
        grep "span id=" | head -n1 |\
        awk -F"?topic=" '{ print $2 }' | awk -F\" '{ print $1 }')
 
 curl -k -o "bcimages${TOPIC}.html" \
-           "https://www.barbearclassico.com/index.php?action=printpage;topic=$TOPIC"
+           "https://www.barbearclassico.com/index.php?action=printpage;topic=$TOPIC" 2>/dev/null
 
 pandoc -s "bcimages${TOPIC}.html" -t rst -o "bcimages${TOPIC}.text"
-
+touch "bcimages${TOPIC}.hash"
 latest=$(cat "bcimages${TOPIC}.text" | grep "Post by" | tail -n1)
 
 if [ -f lastpost.txt ]; then
@@ -87,44 +88,50 @@ LASTPOST=$(cat "bcimages${TOPIC}.text" | grep "Post by" | tail -n1)
 awk '/^Post/{ f = sprintf("docs/doc_%04d.text", d++) } f{print > f} /^`SMF/{f=""}' "bcimages${TOPIC}.text"
 sed -i '$d' docs/doc*
 
-IMAGESDIR="/srv/www/revive-adserver/images"
+IMAGESDIR="${DESTINATION:-/srv/www/revive-adserver/images}"
 IGIMGSOURCE="https://pub.barbearclassico.com/images"
 for article in $( grep -oPi "(jpg)|(jpeg)|(png)" docs/* | cut -d: -f1) ; do
     IGCAPTION="$(cat $article | grep -Pvi 'http[s]*://[a-z0-9-.\/]*.(jpg)|(png)|(jpeg)(gif)' | \
 	    sed -e '/.. raw::/,+3 d' -e 's/*//g' -e '/^$/d' -e 's/^[[:space:]]*//g' | \
 	    jq -sRr @uri)"
     IMAGEURL=$(cat $article | grep -Poi 'http[s]*://[a-z0-9-.\/]*.(jpg)|(png)|(jpeg)(gif)$' | head -n1 )
-    file=$(mktemp ${IMAGESDIR}/imageXXXXXXXX)
+    file=$(mktemp -u ${IMAGESDIR}/imageXXXXXXXX)
     newfile=$(mktemp -u igpostXXXXXXXX)
     curl -k -o "${file}" ${IMAGEURL} 2>/dev/null
-    set -- $(identify -format "%w %h %m" $file)
-    RATIO=$(echo "scale=2 ; ${2} * 16  / ${1}" | bc)
-    EXTENSION=${3}
-    if [ ${2} -gt ${1} ] ; then
-        echo "it's a portrait, make it square"
-        convert -background white -gravity center ${file} -resize ${2}x${2} \
-		-extent ${2}x${2} "${IMAGESDIR}/${newfile}.${EXTENSION}"
-	rm ${file}
-    else
-        if [ $(echo "$RATIO > 9" | bc -l ) -eq 1 ]; then
-            echo "$file: 16x${RATIO} image is Ok for instagram"
-            mv "${file}" "${IMAGESDIR}/${newfile}.${EXTENSION}"
+    set -- $(identify -format "%w %h %m %#" $file)
+    FILEHASH=${4}
+    # "it's a new image? trying ${IMAGEURL}"
+    if [ ! $(cat "bcimages${TOPIC}.hash" | grep ${FILEHASH}) ]; then
+        # echo "new image found: from ${IMAGEURL}"
+        RATIO=$(echo "scale=2 ; ${2} * 16  / ${1}" | bc)
+        EXTENSION=${3}
+        if [ ${2} -gt ${1} ] ; then
+            # echo "it's a portrait, make it square"
+            convert -background white -gravity center ${file} -resize ${2}x${2} \
+    		-extent ${2}x${2} "${IMAGESDIR}/${newfile}.${EXTENSION}"
+    	rm ${file}
         else
-            echo "$file: image ratio is 16x ${RATIO}: IT WILL FAIL TO UPLOAD"
-            # image size should be 16x9 so image height should be $1 * 9 / 16
-            NEWSIZE=$(echo "${1} * 9  / 16" | bc)
-            echo "we should change the image from ${1}x${2} to ${1}x${NEWSIZE}"
-            convert -background white -gravity center ${file} -resize ${1}x${NEWSIZE} \
-            	-extent ${1}x${NEWSIZE} "${IMAGESDIR}/${newfile}.${EXTENSION}"
-            rm ${file}
+            if [ $(echo "$RATIO > 9" | bc -l ) -eq 1 ]; then
+                echo "$file: 16x${RATIO} image is Ok for instagram"
+                mv "${file}" "${IMAGESDIR}/${newfile}.${EXTENSION}"
+            else
+                echo "$file: image ratio is 16x ${RATIO}: IT WILL FAIL TO UPLOAD"
+                # image size should be 16x9 so image height should be $1 * 9 / 16
+                NEWSIZE=$(echo "${1} * 9  / 16" | bc)
+                echo "we should change the image from ${1}x${2} to ${1}x${NEWSIZE}"
+                convert -background white -gravity center ${file} -resize ${1}x${NEWSIZE} \
+                	-extent ${1}x${NEWSIZE} "${IMAGESDIR}/${newfile}.${EXTENSION}"
+                rm ${file}
+            fi
         fi
+        # echo "${IMAGESDIR}/$newfile.${EXTENSION}"
+        chmod 666 "${IMAGESDIR}/$newfile.${EXTENSION}"
+        # echo "${IGIMGSOURCE}/$newfile.${EXTENSION}"
+        IGIMAGE="${IGIMGSOURCE}/$newfile.${EXTENSION}"
+        echo ${IGIMAGE}
+        echo "${IGIMAGE} ${IGCAPTION}" >> postqueue.txt
+        echo ${FILEHASH} >> "bcimages${TOPIC}.hash"
     fi
-    # echo "${IMAGESDIR}/$newfile.${EXTENSION}"
-    chmod 666 "${IMAGESDIR}/$newfile.${EXTENSION}"
-    # echo "${IGIMGSOURCE}/$newfile.${EXTENSION}"
-    IGIMAGE="${IGIMGSOURCE}/$newfile.${EXTENSION}"
-    echo ${IGIMAGE}
-    echo "${IGIMAGE} ${IGCAPTION}" >> postqueue.txt
 done
 
 if [ ${PUBLISH:-} ] ; then
