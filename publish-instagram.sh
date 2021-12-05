@@ -61,7 +61,8 @@ while getopts "f:dq" opt; do
 done
 
 rm -f docs/*
-rm postqueue.txt
+mkdir -p docs
+rm -f postqueue.txt
 TOPIC=$(curl -k  https://www.barbearclassico.com/index.php?board=15.0 2>/dev/null |\
        grep "span id=" | head -n1 |\
        awk -F"?topic=" '{ print $2 }' | awk -F\" '{ print $1 }')
@@ -87,14 +88,14 @@ LASTPOST=$(cat "bcimages${TOPIC}.text" | grep "Post by" | tail -n1)
 awk '/^Post/{ f = sprintf("docs/doc_%04d.text", d++) } f{print > f} /^`SMF/{f=""}' "bcimages${TOPIC}.text"
 sed -i '$d' docs/doc*
 
-IMAGESDIR="/srv/www/revive-adserver/images"
+IMAGESDIR="${DESTINATION:-/srv/www/revive-adserver/images}"
 IGIMGSOURCE="https://pub.barbearclassico.com/images"
 for article in $( grep -oPi "(jpg)|(jpeg)|(png)" docs/* | cut -d: -f1) ; do
     IGCAPTION="$(cat $article | grep -Pvi 'http[s]*://[a-z0-9-.\/]*.(jpg)|(png)|(jpeg)(gif)' | \
 	    sed -e '/.. raw::/,+3 d' -e 's/*//g' -e '/^$/d' -e 's/^[[:space:]]*//g' | \
 	    jq -sRr @uri)"
     IMAGEURL=$(cat $article | grep -Poi 'http[s]*://[a-z0-9-.\/]*.(jpg)|(png)|(jpeg)(gif)$' | head -n1 )
-    file=$(mktemp ${IMAGESDIR}/imageXXXXXXXX)
+    file=$(mktemp -u ${IMAGESDIR}/imageXXXXXXXX)
     newfile=$(mktemp -u igpostXXXXXXXX)
     curl -k -o "${file}" ${IMAGEURL} 2>/dev/null
     set -- $(identify -format "%w %h %m" $file)
