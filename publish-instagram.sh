@@ -63,6 +63,7 @@ done
 rm -f docs/*
 mkdir -p docs
 rm -f postqueue.txt
+touch postqueue.txt
 TOPIC=$(curl -k  https://www.barbearclassico.com/index.php?board=15.0 2>/dev/null |\
        grep "span id=" | head -n1 |\
        awk -F"?topic=" '{ print $2 }' | awk -F\" '{ print $1 }')
@@ -78,7 +79,7 @@ if [ -f lastpost.txt ]; then
     lastpost=$( cat lastpost.txt )
     if [ "$latest" = "$lastpost" ] ; then
 	    echo "nothing to do here"
-	    exit 0
+	    # exit 0
     fi
     line=$( grep -n "$lastpost" "bcimages${TOPIC}.text" | cut -f1 -d: )
 #    [ ${line:-} ] && sed -i  "1,${line}d" "bcimages${TOPIC}.text"
@@ -90,9 +91,10 @@ sed -i '$d' docs/doc*
 
 IMAGESDIR="${DESTINATION:-/srv/www/revive-adserver/images}"
 IGIMGSOURCE="https://pub.barbearclassico.com/images"
-for article in $( grep -oPi "(jpg)|(jpeg)|(png)" docs/* | cut -d: -f1) ; do
+for article in $( grep -oPil "(jpg)|(jpeg)|(png)" docs/*) ; do
     IGCAPTION="$(cat $article | grep -Pvi 'http[s]*://[a-z0-9-.\/]*.(jpg)|(png)|(jpeg)(gif)' | \
-	    sed -e '/.. raw::/,+3 d' -e 's/*//g' -e '/^$/d' -e 's/^[[:space:]]*//g' | \
+	    sed -e 's/, [0-9][0-9]:[0-9][0-9]:[0-9][0-9] [ap]m//g' \
+	        -e '/.. raw::/,+3 d' -e 's/*//g' -e '/^$/d' -e 's/^[[:space:]]*//g' | \
 	    jq -sRr @uri)"
     IMAGEURL=$(cat $article | grep -Poi 'http[s]*://[a-z0-9-.\/]*.(jpg)|(png)|(jpeg)(gif)$' | head -n1 )
     file=$(mktemp -u ${IMAGESDIR}/imageXXXXXXXX)
@@ -102,7 +104,7 @@ for article in $( grep -oPi "(jpg)|(jpeg)|(png)" docs/* | cut -d: -f1) ; do
     FILEHASH=${4}
     # "it's a new image? trying ${IMAGEURL}"
     if [ ! $(cat "bcimages${TOPIC}.hash" | grep ${FILEHASH}) ]; then
-        # echo "new image found: from ${IMAGEURL}"
+        echo "new image found: from ${IMAGEURL}"
         RATIO=$(echo "scale=2 ; ${2} * 16  / ${1}" | bc)
         EXTENSION=${3}
         if [ ${2} -gt ${1} ] ; then
