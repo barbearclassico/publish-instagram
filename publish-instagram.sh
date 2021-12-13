@@ -44,11 +44,12 @@ publishqueue () {
     done
 }
 
-while getopts "f:dq" opt; do
+while getopts "f:t:dq" opt; do
   case ${opt} in
     f) publishqueue $OPTARG
        exit 0
        ;;
+    t) TOPIC=${OPTARG} ;;
     d) unset PUBLISH ;;
     q) quotausage
        exit 0
@@ -64,9 +65,11 @@ rm -f docs/*
 mkdir -p docs
 rm -f postqueue.txt
 touch postqueue.txt
-TOPIC=$(curl -k  https://www.barbearclassico.com/index.php?board=15.0 2>/dev/null |\
+if [ ! ${TOPIC:-} ] ; then
+    TOPIC=$(curl -k  https://www.barbearclassico.com/index.php?board=15.0 2>/dev/null |\
        grep "span id=" | head -n1 |\
        awk -F"?topic=" '{ print $2 }' | awk -F\" '{ print $1 }')
+fi
 
 curl -k -o "bcimages${TOPIC}.html" \
            "https://www.barbearclassico.com/index.php?action=printpage;topic=$TOPIC" 2>/dev/null
