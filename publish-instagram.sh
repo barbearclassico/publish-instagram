@@ -2,6 +2,13 @@
 
 . ./credentials.txt
 
+HASHTAGS="
+#barbearclassico #shaveoftheday
+#sotd #wetshavers
+#shavelikeyourgrandpa #shavelikeagentleman #oldschoolshaving #classicshaving
+"
+
+HASHTAGSBLOCK=$(echo "$HASHTAGS" | jq -sRr @uri)
 PUBLISH=1
 usage () {
 echo
@@ -145,7 +152,7 @@ if [ ${PUBLISH:-} ] ; then
         set -- $line
         echo "Image: $1 Caption $2"
 
-        CREATIONID=$( curl -X POST "https://graph.facebook.com/${IGID}/media?image_url=${1}&caption=${2}&access_token=${TOKEN}" | jq -r .id )
+        CREATIONID=$( curl -X POST "https://graph.facebook.com/${IGID}/media?image_url=${1}&caption=${2}${HASHTAGSBLOCK}&access_token=${TOKEN}" | jq -r .id )
         echo "CREATIONID: ${CREATIONID}"
         if [ ${CREATIONID:-} ] ; then
             curl -X POST "https://graph.facebook.com/${IGID}/media_publish?creation_id=${CREATIONID}&access_token=${TOKEN}" | jq .
@@ -156,3 +163,5 @@ if [ ${PUBLISH:-} ] ; then
     echo ${LASTPOST} > lastpost.txt
 fi
 
+# clean up
+find /srv/www/revive-adserver/images/ -type f -delete
