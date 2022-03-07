@@ -96,15 +96,16 @@ Extract Posts from html
 3. Get the latest Topic from the forum board, and convert it from HTML to restructuredtext.
 4. Get the latest post from the file
 5. if the latest post matches the local latest post (``lastpost.txt``), **carry on**
-    5.1. identify the line with the last post
+    5.1. identify the line with the last post (*deprecated - not doing that anymore*)
 
 
 - Split "^Post" and create new files. Process until find "``\`SMF``"
 - Delete the last line on each snippet.
-    .. code-block:: SHELL
 
-        awk '/^Post/{ f = sprintf("docs/doc_%04d.text", d++) } f{print > f} /^SMF/{f=""}' "bcimages${TOPIC}.text"
-        sed -i '$d' docs/doc*
+.. code-block:: SHELL
+
+    awk '/^Post/{ f = sprintf("docs/doc_%04d.text", d++) } f{print > f} /^SMF/{f=""}' "bcimages${TOPIC}.text"
+    sed -i '$d' docs/doc*
 
 
 Process images on files
@@ -115,9 +116,10 @@ For every mention of image like ``jpg`` ``jpeg`` or ``png`` inside **docs**
 1. grab the caption
 
 2. with imagemagick, grab *width*, *height*, *format* and *checksum*
-    .. code-block:: SHELL
 
-        identify -format "%w %h %m %#" $file
+.. code-block:: SHELL
+
+    identify -format "%w %h %m %#" $file
 
 
 3. If the checksum found is not on the list
