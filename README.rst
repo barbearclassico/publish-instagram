@@ -18,43 +18,46 @@ Usage
       imagemagick
 
 
--d dry-run
-    Just pretends it does something, but doesn't publish
+**-d**
+  dry-run.
+  Just pretends it does something, but doesn't publish
 
--f
-    Publishes from a list of images on a file
-    This skips the processing of the webpage and pushes immediately the images of a preconfigured file.
-    (useful for quick fixes)
+**-f**
+  Publishes from a list of images on a file
+  This skips the processing of the webpage and pushes immediately the images of a preconfigured file.
+  (useful for quick fixes)
+  
+  File format:
 
-    File format:
+  ::
+  
+      <image url><space><caption html format>
 
-    ::
-    
-        <image url> <caption html format>
 
-    Example:
+  Example:
 
-    ::
+  .. code-block:: TEXT
+  
+      https://example.com/images/igpostyDuBp4Ye.JPEG Post%20by%3A%20User
 
-        https://example.com/images/igpostyDuBp4Ye.JPEG Post%20by%3A%20User
 
--q
-    shows the current facebook allowance for postings
+**-q**
+  Shows the current facebook allowance for postings
 
-    ::
-
-        $ sh publish-instagram.sh -q
-        {
-          "data": [
-                    {
-              "config": {
-                "quota_total": 25,
-                "quota_duration": 86400
-              },
-              "quota_usage": 7
-            }
-          ]
-        }
+  ::
+  
+      $ sh publish-instagram.sh -q
+      {
+        "data": [
+                  {
+            "config": {
+              "quota_total": 25,
+              "quota_duration": 86400
+            },
+            "quota_usage": 7
+          }
+        ]
+      }
 
 Configuration
 =============
