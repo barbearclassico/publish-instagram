@@ -113,6 +113,7 @@ Process images on files
 For every mention of image like ``jpg`` ``jpeg`` or ``png`` inside **docs**
 
 1. grab the caption
+
 2. with imagemagick, grab *width*, *height*, *format* and *checksum*
     .. code-block:: SHELL
 
@@ -120,16 +121,18 @@ For every mention of image like ``jpg`` ``jpeg`` or ``png`` inside **docs**
 
 
 3. If the checksum found is not on the list
-    3.1. check the proportions of the image
 
-    - make it square if portrait
-    - if landscape and too wide, make it 16:9
- 
-    3.2. add image location and caption to the ``postqueue.txt``
+- check the proportions of the image
 
-    3.3. add the new found checksum to the list of known images ``bcimages${TOPIC}.hash``
-4. Publish the contents of ``postqueue.txt``
-    On each entry of ``postqueue.txt`` it posts the picture on instagram with the caption and the HASHTAGSBLOCK.
+  - make it square if portrait
+  - if landscape and too wide, make it 16:9
 
-5. Clean up
-    Deletes all the temporary files created.
+- add image location and caption to the ``postqueue.txt``
+
+- add the new found checksum to the list of known images ``bcimages${TOPIC}.hash``
+
+4. Publish the contents of ``postqueue.txt``. On each entry of
+   ``postqueue.txt``, posts the picture on instagram with the caption and the
+   HASHTAGSBLOCK.
+
+5. Clean up. Deletes all the temporary files created.
