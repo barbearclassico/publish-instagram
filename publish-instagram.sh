@@ -2,6 +2,13 @@
 
 . ./credentials.txt
 
+HASHTAGS="
+#barbearclassico #shaveoftheday
+#sotd #wetshavers
+#shavelikeyourgrandpa #shavelikeagentleman #oldschoolshaving #classicshaving
+"
+
+HASHTAGSBLOCK=$(echo "$HASHTAGS" | jq -sRr @uri)
 PUBLISH=1
 usage () {
 echo
@@ -44,11 +51,12 @@ publishqueue () {
     done
 }
 
-while getopts "f:dq" opt; do
+while getopts "f:t:dq" opt; do
   case ${opt} in
     f) publishqueue $OPTARG
        exit 0
        ;;
+    t) TOPIC=${OPTARG} ;;
     d) unset PUBLISH ;;
     q) quotausage
        exit 0
@@ -64,9 +72,11 @@ rm -f docs/*
 mkdir -p docs
 rm -f postqueue.txt
 touch postqueue.txt
-TOPIC=$(curl -k  https://www.barbearclassico.com/index.php?board=15.0 2>/dev/null |\
+if [ ! ${TOPIC:-} ] ; then
+    TOPIC=$(curl -k  https://www.barbearclassico.com/index.php?board=15.0 2>/dev/null |\
        grep "span id=" | head -n1 |\
        awk -F"?topic=" '{ print $2 }' | awk -F\" '{ print $1 }')
+fi
 
 curl -k -o "bcimages${TOPIC}.html" \
            "https://www.barbearclassico.com/index.php?action=printpage;topic=$TOPIC" 2>/dev/null
@@ -142,7 +152,7 @@ if [ ${PUBLISH:-} ] ; then
         set -- $line
         echo "Image: $1 Caption $2"
 
-        CREATIONID=$( curl -X POST "https://graph.facebook.com/${IGID}/media?image_url=${1}&caption=${2}&access_token=${TOKEN}" | jq -r .id )
+        CREATIONID=$( curl -X POST "https://graph.facebook.com/${IGID}/media?image_url=${1}&caption=${2}${HASHTAGSBLOCK}&access_token=${TOKEN}" | jq -r .id )
         echo "CREATIONID: ${CREATIONID}"
         if [ ${CREATIONID:-} ] ; then
             curl -X POST "https://graph.facebook.com/${IGID}/media_publish?creation_id=${CREATIONID}&access_token=${TOKEN}" | jq .
@@ -153,3 +163,5 @@ if [ ${PUBLISH:-} ] ; then
     echo ${LASTPOST} > lastpost.txt
 fi
 
+# clean up
+find /srv/www/revive-adserver/images/ -type f -delete
